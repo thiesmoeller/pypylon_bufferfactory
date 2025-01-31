@@ -1,0 +1,11 @@
+{
+    "files.associations": {
+        "cstdint": "c",
+        "chrono": "cpp",
+        "typeinfo": "cpp",
+        "text_encoding": "cpp",
+        "sstream": "c",
+        "format": "c",
+        "string": "c"
+    }
+}

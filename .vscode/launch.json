@@ -1,0 +1,34 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Python with GDB",
+            "type": "cppdbg", // Use the C++ debugger
+            "request": "launch",
+            "program": "/usr/bin/python3", // Path to your Python interpreter (Adjust if necessary)
+            "args": [
+                "-m",
+                "buffer_interface" // Path to your Python test script
+            ],
+            "stopAtEntry": false, // Set to true if you want to break at the start of the script
+            "cwd": "${workspaceFolder}", // Current working directory
+            "environment": [
+                {
+                    "name": "PYTHONPATH",
+                    "value": "${workspaceFolder}/build:${env:PYTHONPATH}" // Add build directory to PYTHONPATH
+                }
+            ],
+            "externalConsole": false,
+            "MIMode": "gdb",
+            "miDebuggerPath": "/usr/bin/gdb", // Path to GDB (Adjust if necessary)
+            //"miDebuggerArgs": "-ex 'set python print-stack none'" // Optional: Suppress Python stack traces in GDB console
+            "setupCommands": [
+                {
+                    "description": "Enable debuginfod for GDB",
+                    "text": "set debuginfod enabled on",
+                    "ignoreFailures": true
+                }
+            ]
+        }
+    ]
+}
