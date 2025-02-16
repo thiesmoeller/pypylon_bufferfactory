@@ -18,8 +18,10 @@
     }
 
     // Custom deleter for PyObject* using Py_DECREF
-    struct PyObjectDeleter {
-        void operator()(PyObject* obj) const {
+    struct PyObjectDeleter
+    {
+        void operator()(PyObject* obj) const
+        {
             Py_XDECREF(obj); // Use Py_XDECREF in case obj is nullptr
         }
     };
@@ -67,40 +69,49 @@ typedef unsigned int size_t;
 
     // **Limited API "NumPy array-like" check: Check for __array_interface__ attribute**
     PyObjectAutoPtr interface_dict(PyObject_GetAttrString(py_mem_obj, "__array_interface__"));
-    if (interface_dict == NULL) {
+    if (interface_dict == NULL)
+    {
        std::string err_msg = make_error_message("Object does not seem to implement __array_interface__");
        Swig::DirectorMethodException::raise(err_msg.c_str());
     }
-    if (!PyDict_Check(interface_dict.get())) {
+    if (!PyDict_Check(interface_dict.get()))
+    {
        std::string err_msg = make_error_message("__array_interface__ attribute is not a dictionary");
        Swig::DirectorMethodException::raise(err_msg.c_str());
     }
 
     // Get 'data' from the interface dictionary (Limited API dictionary access)
     auto data_value = PyDict_GetItemString(interface_dict.get(), "data");
-    if (data_value == NULL) {
+    if (data_value == NULL)
+    {
         std::string err_msg = make_error_message("'data' key not found in __array_interface__");
         Swig::DirectorMethodException::raise(err_msg.c_str());
     }
-    if (!PyTuple_Check(data_value) || PyTuple_Size(data_value) != 2) {
+
+    if (!PyTuple_Check(data_value) || PyTuple_Size(data_value) != 2)
+    {
        std::string err_msg = make_error_message("'data' in __array_interface__ is not a tuple of size 2");
        Swig::DirectorMethodException::raise(err_msg.c_str());
     }
+
     PyObject *address_obj = PyTuple_GetItem(data_value, 0); // Get the address from the tuple
-    if (!PyLong_Check(address_obj)) {
+    if (!PyLong_Check(address_obj))
+    {
        std::string err_msg = make_error_message("Address in 'data' tuple is not an integer");
        Swig::DirectorMethodException::raise(err_msg.c_str());
     }
     auto data_ptr_int = PyLong_AsUnsignedLongLong(address_obj);
-    printf("BASE_PTR %llu\n", data_ptr_int);
 
     // Get 'shape' from the interface dictionary (Limited API dictionary access)
     auto shape_value = PyDict_GetItemString(interface_dict.get(), "shape");
-    if (shape_value == NULL) {
+    if (shape_value == NULL)
+    {
        std::string err_msg = make_error_message("'shape' key not found in __array_interface__");
        Swig::DirectorMethodException::raise(err_msg.c_str());
     }
-    if (!PyTuple_Check(shape_value)) {
+
+    if (!PyTuple_Check(shape_value))
+    {
        std::string err_msg = make_error_message("'shape' in __array_interface__ is not a tuple");
        Swig::DirectorMethodException::raise(err_msg.c_str());
     }
@@ -132,7 +143,6 @@ typedef unsigned int size_t;
 %typemap(directorin, noblock = 1)(void *pCreatedBuffer, intptr_t bufferContext)
 {
     // in typemap
-    printf("C++: FreeBuffer\n");
     PyObject *py_context = reinterpret_cast<PyObject *>($2);
     if (!py_context)
     {
@@ -155,8 +165,8 @@ typedef unsigned int size_t;
 
 %typemap(directorin) void Pylon::IBufferFactory::DestroyBufferFactory
 {
-    // in typemap
-    printf("C++: DestroyBufferFactory\n");
+    // directorin typemap
+
 }
 
 // Rename the C++ method GetBufferContext to GetBufferObject in Python.
@@ -182,10 +192,12 @@ typedef unsigned int size_t;
     {
         SWIG_exception_fail(SWIG_RuntimeError, "GetBufferObject: stored pointer is NULL; not a valid PyObject");
     }
+
     if (!PyObject_TypeCheck(py_obj, &PyBaseObject_Type))
     {
         SWIG_exception_fail(SWIG_RuntimeError, "GetBufferObject: stored pointer is not a valid Python object");
     }
+
     // Increase the reference count to return a new reference.
     Py_INCREF(py_obj);
     $result = py_obj;
@@ -194,7 +206,8 @@ typedef unsigned int size_t;
 %ignore Pylon::BufferManager::SetBufferFactory;
 %rename(SetBufferFactory) Pylon::BufferManager::_SetBufferFactory;
 %extend Pylon::BufferManager {
-    void _SetBufferFactory(Pylon::IBufferFactory *pFactory) {
+    void _SetBufferFactory(Pylon::IBufferFactory *pFactory)
+    {
         // we force to use Cleanup_Delete to get the DestroyBufferFactory Callback
         // that allows us to decrement the refcount of the factory
         self->SetBufferFactory(pFactory, Pylon::Cleanup_Delete);
@@ -204,13 +217,15 @@ typedef unsigned int size_t;
 
 // Reference counting typemap for our wrapped version
 %typemap(in) Pylon::IBufferFactory *pFactory {
-
-    if ($input == Py_None) {
+    if ($input == Py_None)
+    {
         $1 = nullptr;
-    } else {
+    } else
+    {
         void *argp = 0;
         int res = SWIG_ConvertPtr($input, &argp, $descriptor(Pylon::IBufferFactory *), 0);
-        if (!SWIG_IsOK(res)) {
+        if (!SWIG_IsOK(res))
+        {
             SWIG_exception_fail(SWIG_ArgError(res), "Expected IBufferFactory or None");
         }
         $1 = reinterpret_cast<Pylon::IBufferFactory *>(argp);
@@ -221,40 +236,28 @@ typedef unsigned int size_t;
 %inline%{
 
     namespace Pylon
-    { /*!
-        \class IBufferFactory
-        \brief Usable to create a custom buffer factory when needed.
-      */
+    {
         class IBufferFactory
         {
         public:
-            /// Ensure proper destruction by using a virtual destructor.
             virtual ~IBufferFactory() = 0;
 
-            /*!
-            \brief Allocates a buffer and provides additional context information.
-            */
             virtual void AllocateBuffer(size_t bufferSize, void **pCreatedBuffer, intptr_t &bufferContext) = 0;
 
-            /*!
-            \brief Frees a previously allocated buffer.
-            */
             virtual void FreeBuffer(void *pCreatedBuffer, intptr_t bufferContext) = 0;
 
-            /*!
-            \brief Destroys the buffer factory.
-            */
             virtual void DestroyBufferFactory() = 0;
         };
 
-        inline IBufferFactory::~IBufferFactory() {
-            printf("------~BufferFactory\n");
+        inline IBufferFactory::~IBufferFactory()
+        {
+
         }
 
         enum ECleanup
         {
-            Cleanup_None,  //!< The caller is responsible for deleting the passed object.
-            Cleanup_Delete //!< The passed object is deleted if it is not needed anymore.
+            Cleanup_None,
+            Cleanup_Delete
         };
 
         class BufferManager
@@ -287,7 +290,8 @@ typedef unsigned int size_t;
 
                 // demo fill image
                 auto image_data = reinterpret_cast<uint8_t*>(p_buffer);
-                for(size_t idx = 0; idx < payloadsize; idx++){
+                for(size_t idx = 0; idx < payloadsize; idx++)
+                {
                     image_data[idx] = static_cast<uint8_t>(idx%256);
                 }
             }
