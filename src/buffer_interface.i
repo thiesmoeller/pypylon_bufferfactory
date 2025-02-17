@@ -232,6 +232,12 @@ typedef unsigned int size_t;
     }
 }
 
+%rename (BufferFactory) Pylon::IBufferFactory;
+%rename (BufferManager) Pylon::BufferManager;
+
+%rename(OnBufferFactoryDeregistered) Pylon::IBufferFactory::DestroyBufferFactory;
+
+
 // Inline C++ code for the Pylon namespace
 %inline%{
 
@@ -318,7 +324,7 @@ typedef unsigned int size_t;
 %}
 
 %pythoncode %{
-    class Factory(IBufferFactory):
+    class Factory(BufferFactory):
         def AllocateBuffer(self, size: int):
             print("Factory.AllocateBuffer")
             print(f"      Python: Allocating buffer of size {size}")
@@ -332,7 +338,7 @@ typedef unsigned int size_t;
             print("       Python: FreeBuffer called with buffer_object:", buffer_object, buffer_object.__array_interface__)
             del(buffer_object)
 
-        def DestroyBufferFactory(self):
+        def OnBufferFactoryDeregistered(self):
             print("Factory.DestroyBufferFactory")
             print("      Python: DestroyBufferFactory called")
             del self
