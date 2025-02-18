@@ -5,10 +5,9 @@
             "name": "Python with GDB",
             "type": "cppdbg", // Use the C++ debugger
             "request": "launch",
-            "program": "/usr/bin/python3", // Path to your Python interpreter (Adjust if necessary)
+            "program": "/usr/bin/python3-dbg", // Path to your Python interpreter (Adjust if necessary)
             "args": [
-                "-m",
-                "buffer_interface" // Path to your Python test script
+                "tests/test_buffer_factory.py" // Path to your Python test script
             ],
             "stopAtEntry": false, // Set to true if you want to break at the start of the script
             "cwd": "${workspaceFolder}", // Current working directory
