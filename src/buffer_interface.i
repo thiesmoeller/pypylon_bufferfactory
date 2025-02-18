@@ -1,5 +1,6 @@
 %module(directors = "1") buffer_interface
 %include "stdint.i"
+%include "exception.i"
 
 %{
     #include <Python.h>
@@ -29,6 +30,15 @@
     // Type alias for convenience
     using PyObjectAutoPtr = std::unique_ptr<PyObject, PyObjectDeleter>;
 %}
+
+%exception {
+    try {
+      $action
+    } catch(...) {
+      PyErr_SetString(PyExc_RuntimeError, "Unknown exception"); // Or a more specific exception
+      return NULL; // Important: Return NULL to signal an exception
+    }
+}
 
 typedef unsigned int size_t;
 
@@ -166,7 +176,14 @@ typedef unsigned int size_t;
 %typemap(directorin) void Pylon::IBufferFactory::DestroyBufferFactory
 {
     // directorin typemap
+    printf("Destroy Buffer Factory\n");
+}
 
+%typemap(directorout) void Pylon::IBufferFactory::DestroyBufferFactory
+{
+    // directorout typemap
+    printf("Destroy Buffer Factory\n");
+    Py_XDECREF($self);
 }
 
 // Rename the C++ method GetBufferContext to GetBufferObject in Python.
@@ -226,9 +243,12 @@ typedef unsigned int size_t;
         int res = SWIG_ConvertPtr($input, &argp, $descriptor(Pylon::IBufferFactory *), 0);
         if (!SWIG_IsOK(res))
         {
-            SWIG_exception_fail(SWIG_ArgError(res), "Expected IBufferFactory or None");
+            SWIG_exception_fail(SWIG_ArgError(res), "Expected BufferFactory or None");
         }
+        
         $1 = reinterpret_cast<Pylon::IBufferFactory *>(argp);
+        // increment refcount --> the call into DestroyBufferFactory will decrement it.
+        Py_INCREF($input);
     }
 }
 
@@ -275,23 +295,38 @@ typedef unsigned int size_t;
                 printf("+++++~BufferManager\n");
                 if (m_factory)
                 {
+                    try
+                    {
                     m_factory->DestroyBufferFactory();
+                    } 
+                    catch(...){};
                     m_factory = nullptr;
                 }
                 printf("------~BufferManager\n");
             }
+
             virtual void SetBufferFactory(IBufferFactory *pFactory, ECleanup cleanupProcedure = Cleanup_Delete)
             {
                 if (!pFactory)
                 {
                     throw std::runtime_error("BufferFactory is invalid");
                 }
+                // cleanup
+                if(cleanupProcedure == Cleanup_Delete && m_factory)
+                {
+                    try
+                    {
+                    m_factory->DestroyBufferFactory();
+                    }
+                    catch (...){};
+
+                }
                 m_factory = pFactory;
             }
 
             virtual void StartGrabbing()
             {
-                const size_t payloadsize = 1024 * 1024;
+                const size_t payloadsize = 1024 * 1024 * 25;
                 m_factory->AllocateBuffer(payloadsize, &p_buffer, bufferContext);
 
                 // demo fill image
@@ -321,54 +356,4 @@ typedef unsigned int size_t;
             void *p_buffer;
         };
     }
-%}
-
-%pythoncode %{
-    class Factory(BufferFactory):
-        def AllocateBuffer(self, size: int):
-            print("Factory.AllocateBuffer")
-            print(f"      Python: Allocating buffer of size {size}")
-            buffer = np.ones(size, dtype=np.uint8)
-            print(buffer.__array_interface__)
-            print("allocate", buffer[:])
-            return buffer
-
-        def FreeBuffer(self, buffer_object):
-            print("Factory.FreeBuffer")
-            print("       Python: FreeBuffer called with buffer_object:", buffer_object, buffer_object.__array_interface__)
-            del(buffer_object)
-
-        def OnBufferFactoryDeregistered(self):
-            print("Factory.DestroyBufferFactory")
-            print("      Python: DestroyBufferFactory called")
-            del self
-
-    if __name__ == "__main__":
-        import sys, gc
-        import numpy as np
-        print("This module is being run directly")
-        bi = sys.modules[__name__]
-
-        for _ in range(10000):
-            bf = bi.Factory()
-            m = bi.BufferManager()
-            print("set buffer factory")
-            m.SetBufferFactory(bf)
-            gc.collect()
-
-            print("start grabbing")
-            m.StartGrabbing()
-            print("get buffer object")
-            for get_buf in range(10):
-                a = m.GetBufferObject()
-                print("this is python result:", a.__array_interface__)
-                print("get_buffer", a[:])
-
-            print("stop grabbing")
-            m.StopGrabbing()
-            del(bf)
-            del(m)
-            gc.collect()
-
-        print("finish")
 %}
